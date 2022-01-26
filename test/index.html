@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>图片转文字</title>
+    <script src="./js/tesseract.min.js" type="text/javascript" charset="utf-8"></script>
+  </head>
+  <body>
+    <button onclick="recognizeFile('../images/test-cn-textonly.jpg')">Sample Image</button>
+    <input type="file" onchange="recognizeFile(window.lastFile=this.files[0])">
+    <p><img id="image" /></p>
+    <div id="log"></div>
+
+    <style>
+      #log > div {
+        color: #313131;
+        border-top: 1px solid #dadada;
+        padding: 9px;
+        display: flex;
+      }
+      #log > div:first-child {
+        border: 0;
+      }
+      .status {
+        min-width: 250px;
+      }
+      #log {
+        border: 1px solid #dadada;
+        padding: 10px;
+        margin-top: 20px;
+        min-height: 100px;
+      }
+      body {
+        font-family: sans-serif;
+        margin: 30px;
+      }
+      progress {
+        display: block;
+        width: 100%;
+        transition: opacity 0.5s linear;
+      }
+      progress[value="1"] {
+        opacity: 0.5;
+      }
+    </style>
+
+    <script type="text/javascript">
+
+      async function recognizeFile(file) {
+        const image = document.getElementById('image');
+        image.src = typeof(file) === 'string' ? file : URL.createObjectURL(file);
+
+        document.querySelector("#log").innerHTML = ''
+        const corePath = window.navigator.userAgent.indexOf("Edge") > -1
+                ? './js/tesseract-core.asm.js'
+                : './js/tesseract-core.wasm.js';
+
+        const {
+          createWorker
+        } = Tesseract;
+        const worker = createWorker({
+          workerPath: './js/worker.min.js',
+          langPath: '../lang-data',
+          corePath: corePath,
+          logger: progressUpdate,
+        });
+        await (async () => {
+          await worker.load();
+          await worker.loadLanguage('chi');
+          await worker.initialize('chi');
+          const {
+            data: {
+              text
+            }
+          } = await worker.recognize(file);
+          console.log(text);
+          progressUpdate({status: 'done', text});
+          await worker.terminate();
+        })();
+      }
+
+      function progressUpdate(packet){
+        var log = document.getElementById('log');
+
+        if(log.firstChild && log.firstChild.status === packet.status){
+          if('progress' in packet){
+            var progress = log.firstChild.querySelector('progress')
+            progress.value = packet.progress
+          }
+        }else{
+          var line = document.createElement('div');
+          line.status = packet.status;
+          var status = document.createElement('div')
+          status.className = 'status'
+          status.appendChild(document.createTextNode(packet.status))
+          line.appendChild(status)
+
+          if('progress' in packet){
+            var progress = document.createElement('progress')
+            progress.value = packet.progress
+            progress.max = 1
+            line.appendChild(progress)
+          }
+
+          if(packet.status == 'done'){
+            var pre = document.createElement('pre')
+            pre.appendChild(document.createTextNode(packet.text))
+            line.innerHTML = ''
+            line.appendChild(pre)
+          }
+
+          log.insertBefore(line, log.firstChild)
+        }
+      }
+
+    </script>
+  </body>
+</html>
